@@ -1,0 +1,172 @@
+#!/bin/bash
+
+# tmb 讓測試站merge你的分支
+# bms 讓你的分支merge正式站
+# 參數1 為你的分支（預設為當前分支）
+
+# 定義初始值
+test_remote="origin"
+test_remote_branch="test_serv"
+serv_remote="origin"
+serv_remote_branch="master"
+def_target_branch=""
+# End
+
+
+############### 定義通用功能
+GetTargetBranch() {
+    if [ "$1" == "" ]; then
+        if [ "${def_target_branch}" == "" ]; then
+            target_branch=`git rev-parse --abbrev-ref HEAD`
+        else
+            target_branch=${def_target_branch}
+        fi
+    else 
+        target_branch="$1"
+    fi
+}
+
+GetMethod() {
+    if [ "$1" == "" ]; then
+        echo "You shoud enter \$1 for method."
+        exit 1
+    else 
+        method="$1"
+    fi
+}
+
+GitFetch() {
+    if [ "$1" == "" ]; then 
+        echo "GitFetch need \$1 for remote"
+        exit 1
+    fi
+    if [ "$2" == "" ]; then 
+        echo "GitFetch need \$2 for branch"
+        exit 1
+    fi
+    t_remote="$1";
+    t_branch="$2";
+    git fetch "${t_remote}" "${t_branch}"
+    if [ $? -ne 0 ]; then
+        echo "!!!git fetch $1 fail"
+        exit 1
+    fi
+}
+
+GitCheckout() {
+    echo "=@ GitCheckout ${1}"
+    if [ "$1" == "" ]; then 
+        echo "GitCheckout need \$1 for checkout"
+        exit 1
+    fi
+    git checkout "${1}"
+    if [ $? -ne 0 ]; then
+        echo "!!!git checkout $1 fail"
+        exit 1
+    fi
+    echo ""
+}
+
+GitFFonlyMerge() {
+    echo "=@ GitFFonlyMerge ${1}"
+    if [ "$1" == "" ]; then 
+        echo "GitFFonlyMerge need \$1 for merge"
+        exit 1
+    fi
+    git merge --ff-only "${1}"
+    if [ $? -ne 0 ]; then
+        echo "!!!git merge --ff-only $1 fail"
+        exit 1
+    fi
+    echo ""
+}
+
+GitMerge() {
+    echo "=@ GitMerge ${1}"
+    if [ "$1" == "" ]; then 
+        echo "GitMerge need \$1 for merge"
+        exit 1
+    fi
+    git merge --no-edit "${1}"
+    if [ $? -ne 0 ]; then
+        echo "!!!git merge $1 fail"
+        exit 1
+    fi
+    echo ""
+}
+
+GitUpdateBranchByRemote() {
+    if [ "$1" == "" ]; then 
+        echo "GitUpdateBranch need \$1 for branch"
+        exit 1
+    fi
+    if [ "$2" == "" ]; then 
+        echo "GitUpdateBranch need \$2 for remote"
+        exit 1
+    fi
+    t_branch="$1";
+    t_remote="$2";
+    GitFetch ${t_remote} ${t_branch} 
+    GitCheckout ${t_branch}
+    GitFFonlyMerge "${t_remote}/${t_branch}"
+}
+TmpEchoBasicInfo() {
+    t_remote=$1 
+    t_remote_branch=$2 
+    t_target_branch=$3 
+    echo "[remote]: ${1}"
+    echo "[remote_branch]: ${2}"
+    echo "[target_branch]: ${3}"
+    echo ""
+}
+############### End
+
+############### 定義工具
+
+BMS() {
+    TmpEchoBasicInfo ${serv_remote} ${serv_remote_branch} ${target_branch}
+    GitUpdateBranchByRemote ${serv_remote_branch} ${serv_remote}
+    GitCheckout ${target_branch}
+    GitMerge ${serv_remote_branch} 
+}
+
+TMB() {
+    TmpEchoBasicInfo ${test_remote} ${test_remote_branch} ${target_branch}
+    GitUpdateBranchByRemote ${test_remote_branch} ${test_remote}
+    GitMerge ${target_branch}
+}
+
+SMB() {
+    TmpEchoBasicInfo ${serv_remote} ${serv_remote_branch} ${target_branch}
+    GitUpdateBranchByRemote ${serv_remote_branch} ${serv_remote}
+    GitMerge ${target_branch} 
+}
+
+BMT() {
+    TmpEchoBasicInfo ${test_remote} ${test_remote_branch} ${target_branch}
+    GitUpdateBranchByRemote ${test_remote_branch} ${test_remote}
+    GitCheckout ${target_branch}
+    GitMerge ${test_remote_branch} 
+}
+############### End
+
+
+GetMethod "$1"
+GetTargetBranch "$2"
+
+case ${method} in
+    "bms")
+        BMS
+        ;;
+    "tmb")
+        TMB
+        ;;
+    "smb")
+        SMB
+        ;;
+    "bmt")
+        BMT
+        ;;
+esac
+
+
